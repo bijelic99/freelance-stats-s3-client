@@ -1,10 +1,13 @@
+import org.scalafmt.sbt.ScalafmtPlugin.autoImport.scalafmtOnCompile
 import sbtghpackages.GitHubPackagesPlugin.autoImport.githubRepository
 
-organization := "com.freelance-stats"
+lazy val sharedSettings = Seq(
+  organization := "com.freelance-stats",
+  scalaVersion := "2.13.6",
+  scalafmtOnCompile := true
+)
 
-scalaVersion := "2.13.6"
-
-lazy val githubPackagesConfig = Seq[SettingsDefinition](
+lazy val githubPackagesConfig = Seq(
   githubOwner := "bijelic99",
   githubRepository := "freelance-stats-s3-client",
   githubTokenSource := TokenSource.GitConfig("github.token")
@@ -14,18 +17,33 @@ val AkkaVersion = "2.6.14"
 
 lazy val root =
   (project in file("."))
-    .settings(githubPackagesConfig: _*)
-    .aggregate(s3Client)
+    .settings(
+      Seq(
+        publishArtifact := false
+      ) ++ sharedSettings ++ githubPackagesConfig: _*
+    )
+    .aggregate(s3Client, amazonAsyncS3Client)
 
 lazy val s3Client =
   (project in file("modules/s3-client"))
     .settings(
       Seq(
         name := "s3-client",
-        scalafmtOnCompile := true,
         libraryDependencies ++= Seq(
           "joda-time" % "joda-time" % "2.10.13",
           "com.typesafe.akka" %% "akka-stream" % AkkaVersion
         )
-      ) ++ githubPackagesConfig: _*
+      ) ++ sharedSettings ++ githubPackagesConfig: _*
     )
+
+lazy val amazonAsyncS3Client =
+  (project in file("modules/amazon-async-s3-client"))
+    .settings(
+      Seq(
+        name := "amazon-async-s3-client",
+        libraryDependencies ++= Seq(
+          "software.amazon.awssdk" % "s3" % "2.17.81"
+        )
+      ) ++ sharedSettings ++ githubPackagesConfig: _*
+    )
+    .dependsOn(s3Client)
