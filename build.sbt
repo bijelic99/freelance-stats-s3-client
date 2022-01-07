@@ -42,7 +42,8 @@ lazy val amazonAsyncS3Client =
       Seq(
         name := "amazon-async-s3-client",
         libraryDependencies ++= Seq(
-          "software.amazon.awssdk" % "s3" % "2.17.81"
+          "software.amazon.awssdk" % "s3" % "2.17.81",
+          "com.typesafe.akka" %% "akka-actor-typed" % AkkaVersion
         )
       ) ++ sharedSettings ++ githubPackagesConfig: _*
     )

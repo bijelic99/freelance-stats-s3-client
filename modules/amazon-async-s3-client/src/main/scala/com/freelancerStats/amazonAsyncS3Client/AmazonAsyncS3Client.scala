@@ -1,7 +1,8 @@
 package com.freelancerStats.amazonAsyncS3Client
 
+import akka.actor.ActorSystem
 import akka.stream.Materializer
-import akka.stream.scaladsl.{Keep, Sink, Source}
+import akka.stream.scaladsl.{Keep, Sink, Source, StreamConverters}
 import akka.util.ByteString
 import com.freelanceStats.s3Client.S3Client
 import com.freelanceStats.s3Client.models.FileReference
@@ -31,6 +32,7 @@ import scala.jdk.FutureConverters._
 trait AmazonAsyncS3Client extends S3Client {
 
   implicit val executionContext: ExecutionContext
+  implicit val actorSystem: ActorSystem
   implicit val materializer: Materializer
 
   def configuration: S3ClientConfiguration
@@ -57,6 +59,10 @@ trait AmazonAsyncS3Client extends S3Client {
       )
       .build()
 
+  lazy val getObjectResponseTransformer
+      : StreamResponseTransformer[GetObjectResponse] =
+    StreamResponseTransformer[GetObjectResponse](actorSystem)
+
   override def get(
       fileReference: FileReference
   ): Future[Option[(FileReference, Source[ByteString, _])]] =
@@ -67,7 +73,7 @@ trait AmazonAsyncS3Client extends S3Client {
           .bucket(fileReference.bucket)
           .key(fileReference.key)
           .build(),
-        StreamResponseTransformer[GetObjectResponse]()
+        getObjectResponseTransformer
       )
       .asScala
       .map { case ResponseSource(response, source) =>
@@ -91,22 +97,31 @@ trait AmazonAsyncS3Client extends S3Client {
   override def put(
       fileReference: FileReference,
       file: Source[ByteString, _]
-  ): Future[FileReference] =
+  ): Future[FileReference] = {
+    lazy val fileByteArray =
+      file.runWith(StreamConverters.asInputStream()).readAllBytes()
     client
       .putObject(
         PutObjectRequest
           .builder()
           .bucket(fileReference.bucket)
           .key(fileReference.key)
-          .pipe(b => fileReference.size.fold(b)(b.contentLength(_)))
-          .build(),
-        AsyncRequestBody
-          .fromPublisher(
-            file
-              .map(_.asByteBuffer)
-              .toMat(Sink.asPublisher(false))(Keep.right)
-              .run()
+          .pipe(b =>
+            fileReference.size
+              .fold(b.contentLength(fileByteArray.length))(b.contentLength(_))
           )
+          .build(),
+        fileReference.size.fold(
+          AsyncRequestBody.fromBytes(fileByteArray)
+        )(_ =>
+          AsyncRequestBody
+            .fromPublisher(
+              file
+                .map(_.asByteBuffer)
+                .toMat(Sink.asPublisher(false))(Keep.right)
+                .run()
+            )
+        )
       )
       .asScala
       .map(response =>
@@ -115,5 +130,6 @@ trait AmazonAsyncS3Client extends S3Client {
           eTag = Some(response.eTag())
         )
       )
+  }
 
 }
