@@ -19,6 +19,7 @@ lazy val root =
   (project in file("."))
     .settings(
       Seq(
+        name:= "s3-client",
         publishArtifact := false
       ) ++ sharedSettings ++ githubPackagesConfig: _*
     )
