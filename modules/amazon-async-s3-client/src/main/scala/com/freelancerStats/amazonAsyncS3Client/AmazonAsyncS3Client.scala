@@ -89,8 +89,7 @@ trait AmazonAsyncS3Client extends S3Client {
         )
       }
       .recover {
-        case t: ExecutionContext
-            if t.getCause.isInstanceOf[NoSuchKeyException] =>
+        case t if t.getCause.isInstanceOf[NoSuchKeyException] =>
           None
       }
 
