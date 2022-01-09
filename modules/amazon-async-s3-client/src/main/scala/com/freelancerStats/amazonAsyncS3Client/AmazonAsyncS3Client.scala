@@ -109,6 +109,10 @@ trait AmazonAsyncS3Client extends S3Client {
             fileReference.size
               .fold(b.contentLength(fileByteArray.length))(b.contentLength(_))
           )
+          .pipe(b =>
+            fileReference.contentType
+              .fold(b)(b.contentType)
+          )
           .build(),
         fileReference.size.fold(
           AsyncRequestBody.fromBytes(fileByteArray)
